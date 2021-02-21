@@ -11,14 +11,9 @@ bool mmio_in_managed_range(struct mmio *mmio, uint16_t addr)
 uint8_t mmio_default_read(struct mmio *mmio, uint16_t addr)
 {
     assert(mmio_in_managed_range(mmio, addr));
-    /*
-    return mmio_in_managed_range(mmio, addr)
-        ? 0x0000
-        : mmio->data[addr - mmio->managed_memory_start];
-    */
+
     addr -= mmio->managed_memory_start;
-    uint8_t data = mmio->data[addr];
-    return data;
+    return mmio->data[addr];
 }
 
 void mmio_default_write(struct mmio *mmio, uint16_t addr, uint8_t val)

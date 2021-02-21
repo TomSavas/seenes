@@ -1,9 +1,14 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
+
+#include "raylib.h"
 
 #include "cpu_6502.h"
 #include "bus.h"
 #include "mmio.h"
+
+#include "decompiler.c"
 
 struct emu
 {
@@ -19,7 +24,15 @@ struct emu
 
     struct bus cpu_bus;
     struct bus ppu_bus;
+
+    // Controls
+    bool paused;
+
+    // Visualization
+    Font font;
 };
+
+#include "draw_info.c"
 
 void write_test(uint8_t *mem)
 {
@@ -74,13 +87,27 @@ void write_test(uint8_t *mem)
     mem[0x8000 + 27] = 0xEA;
 }
 
+void emu_reset(struct emu *emu)
+{
+    emu->cpu = (struct cpu_6502){ 0 };
+    emu->cpu.bus = &emu->cpu_bus;
+    memset(emu->mem, 0, 0x1FFF);
+
+    write_test(emu->mem);
+
+    cpu_reset(&emu->cpu);
+}
+
 struct emu init_emu()
 {
     struct emu emu =
     {
-        .cpu = {},
         .mem = (uint8_t*)malloc(1 << 16),
-        .cpu_bus = init_bus(10)
+        .cpu_bus = init_bus(10),
+
+        .paused = true,
+        
+        .font = LoadFont("../font.ttf")
     };
 
     // Set up memory map
@@ -89,14 +116,12 @@ struct emu init_emu()
     emu.apu_registers = make_mmio(0x4000, 0x401F, &emu.mem[0x4000]);
     emu.cartridge = make_mmio(0x4020, 0xFFFF, &emu.mem[0x4020]);
 
-    emu.cpu.bus = &emu.cpu_bus;
     attach(&emu.cpu_bus, (struct mmio*)&emu.ram);
     attach(&emu.cpu_bus, (struct mmio*)&emu.ppu_registers);
     attach(&emu.cpu_bus, &emu.apu_registers);
     attach(&emu.cpu_bus, &emu.cartridge);
 
-    write_test(emu.mem);
-    cpu_reset(&emu.cpu);
+    emu_reset(&emu);
 
     return emu;
 }
@@ -108,17 +133,45 @@ void clock(struct emu *emu)
 
 int main()
 {
+    InitWindow(1400, 960, "seenes");   
+    SetTargetFPS(-1);
+
     struct emu emu = init_emu();
 
-    for(int i = 0; i < 188; i++)
+    while(!WindowShouldClose())
     {
+        BeginDrawing();
+        ClearBackground((Color) { 0, 0, 164 } );
+
+        draw_working_mem(&emu);
+        draw_cpu_state(&emu);
+        draw_ram(&emu);
+
+        draw_game(&emu);
+
+        DrawFPS(0, 0);
+        EndDrawing();
+
+        if (IsKeyPressed(KEY_R))
+        {
+            emu_reset(&emu);
+        }
+
+        if (IsKeyPressed(KEY_P))
+        {
+            emu.paused = !emu.paused;
+        }
+
+        if (emu.paused)
+        {
+            if (!IsKeyPressed(KEY_O))
+                continue;
+        }
+
         clock(&emu);
-    };
-    printf("RAM:\n");
-    printf("0x0000: %x\n", emu.mem[0x0000]);
-    printf("0x0001: %x\n", emu.mem[0x0001]);
-    printf("0x0002: %x\n", emu.mem[0x0002]);
-    printf("...\n");
+    }
+
+    CloseWindow();
 
     return 0;
 }

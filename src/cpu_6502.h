@@ -8,13 +8,15 @@ struct cpu_6502;
 struct instruction
 {
     const char *op_code_name;
-
     void (*instruction_fn)(struct cpu_6502 *);
+
+    const char *addr_mode_name;
     void (*addressing_mode_fn)(struct cpu_6502 *);
 
     uint8_t base_cycle_count;
 
-    uint8_t operand;
+    uint8_t operand0;
+    uint8_t operand1;
     uint16_t addr;
 };
 
@@ -67,6 +69,9 @@ struct cpu_6502
 
     uint64_t cycles;
 };
+
+uint8_t get_flag(struct cpu_6502 *cpu, enum status_flag flag);
+void set_flag(struct cpu_6502 *cpu, enum status_flag flag, bool set);
 
 bool cpu_clock(struct cpu_6502 *cpu);
 void cpu_reset(struct cpu_6502 *cpu);

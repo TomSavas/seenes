@@ -55,7 +55,7 @@ void detach(struct bus *bus, struct mmio *mmio)
     }
 }
 
-uint8_t read(struct bus *bus, uint16_t addr)
+uint8_t bus_read(struct bus *bus, uint16_t addr)
 {
     for (int i = 0; i < bus->devices_count; i++)
     {
@@ -66,7 +66,7 @@ uint8_t read(struct bus *bus, uint16_t addr)
     return 0x00;
 }
 
-void write(struct bus *bus, uint16_t addr, uint8_t val)
+void bus_write(struct bus *bus, uint16_t addr, uint8_t val)
 {
     for (int i = 0; i < bus->devices_count; i++)
     {
