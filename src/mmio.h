@@ -14,11 +14,13 @@ enum mmio_type
 struct mmio
 {
     enum mmio_type type;
+    const char *name;
 
     uint16_t managed_memory_start;
     uint16_t managed_memory_end;
 
     uint8_t *data;
+    void *additional_data;
 
     uint8_t (*mmio_read)(struct mmio *mmio, uint16_t addr);
     void (*mmio_write)(struct mmio *mmio, uint16_t addr, uint8_t val);
@@ -34,15 +36,10 @@ struct mirrored_mmio
 };
 
 struct mirrored_mmio make_mirrored_mmio(struct mmio mmio, uint16_t actual_memory_start, uint16_t actual_memory_end);
-//uint8_t mirrored_mmio_read(struct mmio *mmio, uint16_t addr);
-//void mirrored_mmio_write(struct mmio *mmio, uint16_t addr, uint8_t val);
-
 struct mmio make_mmio(uint16_t memory_start, uint16_t memory_end, uint8_t *data);
 
 bool mmio_in_managed_range(struct mmio *mmio, uint16_t addr);
 
-//uint8_t mmio_default_read(struct mmio *mmio, uint16_t addr);
-//void mmio_default_write(struct mmio *mmio, uint16_t addr, uint8_t val);
 uint8_t mmio_read(struct mmio *mmio, uint16_t addr);
 void mmio_write(struct mmio *mmio, uint16_t addr, uint8_t val);
 

@@ -1,12 +1,13 @@
 #include <stdbool.h>
 #include <stdio.h>
+#include <signal.h>
 
 #include "cpu_6502.h"
 #include "bus.h"
 
 static const struct instruction instructions[] = 
 {
-/*         0x00                                0x01                                0x02                                0x03                                0x04                                0x05                                0x06                                0x07                                0x08                                0x09                                0x0A                         0x0B                         0x0C                         0x0D                         0x0E                         0x0F                   */
+/*         0x00                                0x01                                0x02                                0x03                                0x04                                0x05                                0x06                                0x07                                0x08                                0x09                                0x0A                                0x0B                                0x0C                                0x0D                                0x0E                                0x0F                             */
 /* 0x00 */ { "BRK", &brk, "IMP", &am_imp, 7 }, { "ORA", &ora, "INX", &am_inx, 6 }, { "???", &nop, "IMP", &am_imp, 2 }, { "???", &nop, "IMP", &am_imp, 8 }, { "???", &nop, "IMP", &am_imp, 3 }, { "ORA", &ora, "ZP0", &am_zp0, 3 }, { "ASL", &asl, "ZP0", &am_zp0, 5 }, { "???", &nop, "IMP", &am_imp, 5 }, { "PHP", &php, "IMP", &am_imp, 3 }, { "ORA", &ora, "IMM", &am_imm, 2 }, { "ASL", &asl, "ACC", &am_acc, 2 }, { "???", &nop, "IMP", &am_imp, 2 }, { "???", &nop, "IMP", &am_imp, 4 }, { "ORA", &ora, "ABS", &am_abs, 4 }, { "ASL", &asl, "ABS", &am_abs, 6 }, { "???", &nop, "IMP", &am_imp, 6 },
 /* 0x10 */ { "BPL", &bpl, "REL", &am_rel, 2 }, { "ORA", &ora, "INY", &am_iny, 5 }, { "???", &nop, "IMP", &am_imp, 2 }, { "???", &nop, "IMP", &am_imp, 8 }, { "???", &nop, "IMP", &am_imp, 4 }, { "ORA", &ora, "ZPX", &am_zpx, 4 }, { "ASL", &asl, "ZPX", &am_zpx, 6 }, { "???", &nop, "IMP", &am_imp, 6 }, { "CLC", &clc, "IMP", &am_imp, 2 }, { "ORA", &ora, "ABY", &am_aby, 4 }, { "???", &nop, "IMP", &am_imp, 2 }, { "???", &nop, "IMP", &am_imp, 7 }, { "???", &nop, "IMP", &am_imp, 4 }, { "ORA", &ora, "ABX", &am_abx, 4 }, { "ASL", &asl, "ABX", &am_abx, 7 }, { "???", &nop, "IMP", &am_imp, 7 },
 /* 0x20 */ { "JSR", &jsr, "ABS", &am_abs, 6 }, { "AND", &and, "INX", &am_inx, 6 }, { "???", &nop, "IMP", &am_imp, 2 }, { "???", &nop, "IMP", &am_imp, 8 }, { "BIT", &bit, "ZP0", &am_zp0, 3 }, { "AND", &and, "ZP0", &am_zp0, 3 }, { "ROL", &rol, "ZP0", &am_zp0, 5 }, { "???", &nop, "IMP", &am_imp, 5 }, { "PLP", &plp, "IMP", &am_imp, 4 }, { "AND", &and, "IMM", &am_imm, 2 }, { "ROL", &rol, "ACC", &am_acc, 2 }, { "???", &nop, "IMP", &am_imp, 2 }, { "BIT", &bit, "ABS", &am_abs, 4 }, { "AND", &and, "ABS", &am_abs, 4 }, { "ROL", &rol, "ABS", &am_abs, 6 }, { "???", &nop, "IMP", &am_imp, 6 },
@@ -25,24 +26,24 @@ static const struct instruction instructions[] =
 /* 0xF0 */ { "BEQ", &beq, "REL", &am_rel, 2 }, { "SBC", &sbc, "INY", &am_iny, 5 }, { "???", &nop, "IMP", &am_imp, 2 }, { "???", &nop, "IMP", &am_imp, 8 }, { "???", &nop, "IMP", &am_imp, 4 }, { "SBC", &sbc, "ZPX", &am_zpx, 4 }, { "INC", &inc, "ZPX", &am_zpx, 6 }, { "???", &nop, "IMP", &am_imp, 6 }, { "SED", &sed, "IMP", &am_imp, 2 }, { "SBC", &sbc, "ABY", &am_aby, 4 }, { "NOP", &nop, "IMP", &am_imp, 2 }, { "???", &nop, "IMP", &am_imp, 7 }, { "???", &nop, "IMP", &am_imp, 4 }, { "SBC", &sbc, "ABX", &am_abx, 4 }, { "INC", &inc, "ABX", &am_abx, 7 }, { "???", &nop, "IMP", &am_imp, 7 }
 };
 
-uint8_t instruction_data(struct cpu_6502 *cpu)
+uint8_t instruction_data(const struct cpu_6502 *cpu)
 {
     return cpu->instruction.addressing_mode_fn == &am_imm || cpu->instruction.addressing_mode_fn == &am_acc
         ? cpu->instruction.operand0
         : bus_read(cpu->bus, cpu->instruction.addr);
 }
 
-uint8_t get_flag(struct cpu_6502 *cpu, enum status_flag flag)
+uint8_t get_flag(struct cpu_6502 *cpu, enum cpu_status_flag flag)
 {
-    return (cpu->reg.s & flag) != 0 ? 1 : 0;
+    return (cpu->reg.s.reg & flag) != 0 ? 1 : 0;
 }
 
-void set_flag(struct cpu_6502 *cpu, enum status_flag flag, bool set)
+void set_flag(struct cpu_6502 *cpu, enum cpu_status_flag flag, bool set)
 {
     if (set)
-        cpu->reg.s |= flag;
+        cpu->reg.s.reg |= flag;
     else
-        cpu->reg.s &= ~flag;
+        cpu->reg.s.reg &= ~flag;
 }
 
 void branch(struct cpu_6502 *cpu)
@@ -58,18 +59,18 @@ void branch(struct cpu_6502 *cpu)
 
 void stack_push(struct cpu_6502 *cpu, uint8_t val)
 {
-    bus_write(cpu->bus, cpu->reg.sp++, val);
+    bus_write(cpu->bus, 0x0100 | (uint16_t)(cpu->reg.sp--), val);
 }
 
 void stack_addr_push(struct cpu_6502 *cpu, uint16_t ptr)
 {
+    stack_push(cpu, (uint8_t)(ptr >> 8));
     stack_push(cpu, (uint8_t)(ptr & 0x00FF));
-    stack_push(cpu, (uint8_t)(ptr << 8));
 }
 
 uint8_t stack_pull(struct cpu_6502 *cpu)
 {
-    return bus_read(cpu->bus, cpu->reg.sp--);
+    return bus_read(cpu->bus, 0x0100 | (uint16_t)(++cpu->reg.sp));
 }
 
 uint16_t stack_addr_pull(struct cpu_6502 *cpu)
@@ -87,17 +88,19 @@ uint8_t fetch(struct cpu_6502 *cpu)
 
 bool cpu_clock(struct cpu_6502 *cpu)
 {
+    if (cpu->cycles_till_instruction_completion == 0)
+    {
+        cpu->raw_instruction = fetch(cpu);
+        cpu->instruction = instructions[cpu->raw_instruction];
+        cpu->cycles_till_instruction_completion = cpu->instruction.base_cycle_count;
+
+        cpu->instruction.addressing_mode_fn(cpu);
+        if (!cpu->disable_instruction_execution)
+            cpu->instruction.instruction_fn(cpu);
+    }
+
+    cpu->cycles_till_instruction_completion--;
     cpu->cycles++;
-    if (cpu->cycles_till_instruction_completion-- > 0)
-        return false;
-
-    cpu->instruction.instruction_fn(cpu);
-
-    // Load up a new instruction
-    cpu->instruction = instructions[fetch(cpu)];
-    cpu->cycles_till_instruction_completion = cpu->instruction.base_cycle_count;
-
-    cpu->instruction.addressing_mode_fn(cpu);
 
     return true;
 }
@@ -110,32 +113,50 @@ void cpu_reset(struct cpu_6502 *cpu)
     uint16_t high = (uint16_t)bus_read(cpu->bus, 0xFFFD) << 8;
     uint16_t addr = high | low;
     cpu->reg.pc = addr;
+    cpu->cycles_till_instruction_completion = 8;
 }
 
 void irq(struct cpu_6502 *cpu)
 {
-    // TODO: probably stash some stuff
+    if (!get_flag(cpu, CPU_I))
+        return;
+
+    stack_addr_push(cpu, cpu->reg.pc);
+
+    set_flag(cpu, CPU_B, false);
+    set_flag(cpu, CPU_U, true);
+    set_flag(cpu, CPU_I, true);
+    stack_push(cpu, cpu->reg.s.reg);
+
     cpu->reg.pc = ((uint16_t)bus_read(cpu->bus, 0xFFFF) << 8) | (uint16_t)bus_read(cpu->bus, 0xFFFE);
+    cpu->cycles_till_instruction_completion = 7;
 }
 
 void nmi(struct cpu_6502 *cpu)
 {
-    // TODO: probably stash some stuff
+    stack_addr_push(cpu, cpu->reg.pc);
+
+    set_flag(cpu, CPU_B, false);
+    set_flag(cpu, CPU_U, true);
+    set_flag(cpu, CPU_I, true);
+    stack_push(cpu, cpu->reg.s.reg);
+
     cpu->reg.pc = ((uint16_t)bus_read(cpu->bus, 0xFFFB) << 8) | (uint16_t)bus_read(cpu->bus, 0xFFFA);
+    cpu->cycles_till_instruction_completion = 8;
 }
 
 void adc(struct cpu_6502 *cpu)
 {
     uint16_t data = (uint16_t)instruction_data(cpu);
-    uint16_t res = (uint16_t)cpu->reg.a + data + (uint16_t)get_flag(cpu, C);
+    uint16_t res = (uint16_t)cpu->reg.a + data + (uint16_t)get_flag(cpu, CPU_C);
 
-    set_flag(cpu, C, res > 0x00FF);
-    set_flag(cpu, Z, (res & 0x00FF) == 0x00);
-    set_flag(cpu, N, (res & 0x0080) != 0x00);
+    set_flag(cpu, CPU_C, res > 0x00FF);
+    set_flag(cpu, CPU_Z, (res & 0x00FF) == 0x00);
+    set_flag(cpu, CPU_N, (res & 0x0080) != 0x00);
 
-    bool positive_overflow = ~(cpu->reg.a & 0x80) & ~(data & 0x80) & (res & 0x0080);
-    bool negative_underflow = (cpu->reg.a & 0x80) & (data & 0x80) & ~(res & 0x0080);
-    set_flag(cpu, V, positive_overflow || negative_underflow);
+    bool overflow = ~(cpu->reg.a & 0x80) & ~(data & 0x80) & (res & 0x0080);
+    bool underflow = (cpu->reg.a & 0x80) & (data & 0x80) & ~(res & 0x0080);
+    set_flag(cpu, CPU_V, overflow || underflow);
 
     cpu->reg.a = res & 0x00FF;
 }
@@ -144,17 +165,17 @@ void and(struct cpu_6502 *cpu)
 {
     cpu->reg.a = cpu->reg.a & instruction_data(cpu);
 
-    set_flag(cpu, Z, (cpu->reg.a & 0x00FF) == 0x00);
-    set_flag(cpu, N, (cpu->reg.a & 0x0080) != 0x00);
+    set_flag(cpu, CPU_Z, (cpu->reg.a & 0x00FF) == 0x00);
+    set_flag(cpu, CPU_N, cpu->reg.a & 0x0080);
 }
 
 void asl(struct cpu_6502 *cpu)
 {
     uint16_t res = (uint16_t)(instruction_data(cpu)) << 1;
 
-    set_flag(cpu, C, res > 0x00FF);
-    set_flag(cpu, Z, (res & 0x00FF) == 0x00);
-    set_flag(cpu, N, (res & 0x0080) != 0x00);
+    set_flag(cpu, CPU_C, res > 0x00FF);
+    set_flag(cpu, CPU_Z, (res & 0x00FF) == 0x00);
+    set_flag(cpu, CPU_N, res & 0x0080);
 
     if (cpu->instruction.addressing_mode_fn == &am_acc)
         cpu->reg.a = (uint8_t)(res & 0x00FF);
@@ -164,19 +185,19 @@ void asl(struct cpu_6502 *cpu)
 
 void bcc(struct cpu_6502 *cpu)
 {
-    if (!get_flag(cpu, C))
+    if (!get_flag(cpu, CPU_C))
         branch(cpu);
 }
 
 void bcs(struct cpu_6502 *cpu)
 {
-    if (get_flag(cpu, C))
+    if (get_flag(cpu, CPU_C))
         branch(cpu);
 }
 
 void beq(struct cpu_6502 *cpu)
 {
-    if (get_flag(cpu, Z))
+    if (get_flag(cpu, CPU_Z))
         branch(cpu);
 }
 
@@ -184,102 +205,109 @@ void bit(struct cpu_6502 *cpu)
 {
     uint8_t byte = instruction_data(cpu);
 
-    set_flag(cpu, N, byte & 0x80);
-    // todo: dafuq, javidx9 did this with a !
-    set_flag(cpu, Z, byte & cpu->reg.a);
-    set_flag(cpu, V, byte & 0x40);
+    set_flag(cpu, CPU_N, byte & 0x80);
+    set_flag(cpu, CPU_Z, (byte & cpu->reg.a) == 0x00);
+    set_flag(cpu, CPU_V, byte & 0x40);
 }
 
 void bmi(struct cpu_6502 *cpu)
 {
-    if (get_flag(cpu, N))
+    if (get_flag(cpu, CPU_N))
         branch(cpu);
 }
 
 void bne(struct cpu_6502 *cpu)
 {
-    if (!get_flag(cpu, Z))
+    if (!get_flag(cpu, CPU_Z))
         branch(cpu);
 }
 
 void bpl(struct cpu_6502 *cpu)
 {
-    if (!get_flag(cpu, N))
+    if (!get_flag(cpu, CPU_N))
         branch(cpu);
 }
 
 void brk(struct cpu_6502 *cpu)
 {
-    set_flag(cpu, I, true);
-    stack_addr_push(cpu, cpu->reg.pc - 1);
+    set_flag(cpu, CPU_I, true);
+    stack_addr_push(cpu, cpu->reg.pc);
+
+    set_flag(cpu, CPU_B, true);
     stack_push(cpu, cpu->reg.sp);
+    set_flag(cpu, CPU_B, false);
+
+    cpu->reg.pc = ((uint16_t)bus_read(cpu->bus, 0xFFFF) << 8) | (uint16_t)bus_read(cpu->bus, 0xFFFE);
 }
 
 void bvc(struct cpu_6502 *cpu)
 {
-    if (!get_flag(cpu, V))
+    if (!get_flag(cpu, CPU_V))
         branch(cpu);
 }
 
 void bvs(struct cpu_6502 *cpu)
 {
-    if (get_flag(cpu, V))
+    if (get_flag(cpu, CPU_V))
         branch(cpu);
 }
 
 void clc(struct cpu_6502 *cpu)
 {
-    set_flag(cpu, C, 0);
+    set_flag(cpu, CPU_C, false);
 }
 
 void cld(struct cpu_6502 *cpu)
 {
-    set_flag(cpu, D, 0);
+    set_flag(cpu, CPU_D, false);
 }
 
 void cli(struct cpu_6502 *cpu)
 {
-    set_flag(cpu, I, 0);
+    set_flag(cpu, CPU_I, false);
 }
 
 void clv(struct cpu_6502 *cpu)
 {
-    set_flag(cpu, V, 0);
+    set_flag(cpu, CPU_V, false);
 }
 
 void cmp(struct cpu_6502 *cpu)
 {
-    uint16_t byte = (uint16_t)cpu->reg.a - (uint16_t)instruction_data(cpu);
+    uint16_t data = (uint16_t)instruction_data(cpu);
+    uint16_t byte = (uint16_t)cpu->reg.a - data;
 
-    set_flag(cpu, N, (byte & 0x80) != 0);
-    set_flag(cpu, Z, byte == 0);
-    set_flag(cpu, C, (byte & 0xFF00) != 0);
+    set_flag(cpu, CPU_N, byte & 0x0080);
+    set_flag(cpu, CPU_Z, (byte & 0x00FF) == 0x0000);
+    set_flag(cpu, CPU_C, cpu->reg.a >= data);
 }
 
 void cpx(struct cpu_6502 *cpu)
 {
-    uint16_t byte = (uint16_t)cpu->reg.x - (uint16_t)instruction_data(cpu);
+    uint16_t data = (uint16_t)instruction_data(cpu);
+    uint16_t byte = (uint16_t)cpu->reg.x - data;
 
-    set_flag(cpu, N, (byte & 0x80) != 0);
-    set_flag(cpu, Z, byte == 0);
-    set_flag(cpu, C, (byte & 0xFF00) != 0);
+    set_flag(cpu, CPU_N, byte & 0x0080);
+    set_flag(cpu, CPU_Z, (byte & 0x00FF) == 0x0000);
+    set_flag(cpu, CPU_C, cpu->reg.x >= data);
 }
 
 void cpy(struct cpu_6502 *cpu)
 {
-    uint16_t byte = (uint16_t)cpu->reg.y - (uint16_t)instruction_data(cpu);
+    uint16_t data = (uint16_t)instruction_data(cpu);
+    uint16_t byte = (uint16_t)cpu->reg.y - data;
 
-    set_flag(cpu, N, (byte & 0x80) != 0);
-    set_flag(cpu, Z, byte == 0);
-    set_flag(cpu, C, (byte & 0xFF00) != 0);
+    set_flag(cpu, CPU_N, byte & 0x0080);
+    set_flag(cpu, CPU_Z, (byte & 0x00FF) == 0x0000);
+    set_flag(cpu, CPU_C, cpu->reg.y >= data);
 }
 
 void dec(struct cpu_6502 *cpu)
 {
     uint8_t res = instruction_data(cpu) - 1;
 
-    set_flag(cpu, N, (res & 0x80) != 0);
-    set_flag(cpu, Z, res == 0);
+    set_flag(cpu, CPU_N, res & 0x80);
+    set_flag(cpu, CPU_Z, res == 0);
 
     bus_write(cpu->bus, cpu->instruction.addr, res);
 }
@@ -288,32 +316,32 @@ void dex(struct cpu_6502 *cpu)
 {
     cpu->reg.x--;
 
-    set_flag(cpu, N, (cpu->reg.x & 0x80) != 0);
-    set_flag(cpu, Z, cpu->reg.x == 0);
+    set_flag(cpu, CPU_N, cpu->reg.x & 0x80);
+    set_flag(cpu, CPU_Z, cpu->reg.x == 0);
 }
 
 void dey(struct cpu_6502 *cpu)
 {
     cpu->reg.y--;
 
-    set_flag(cpu, N, (cpu->reg.y & 0x80) != 0);
-    set_flag(cpu, Z, cpu->reg.y == 0);
+    set_flag(cpu, CPU_N, cpu->reg.y & 0x80);
+    set_flag(cpu, CPU_Z, cpu->reg.y == 0);
 }
 
 void eor(struct cpu_6502 *cpu)
 {
     cpu->reg.a ^= instruction_data(cpu);
 
-    set_flag(cpu, N, (cpu->reg.a & 0x80) != 0);
-    set_flag(cpu, Z, cpu->reg.a == 0);
+    set_flag(cpu, CPU_N, cpu->reg.a & 0x80);
+    set_flag(cpu, CPU_Z, cpu->reg.a == 0);
 }
 
 void inc(struct cpu_6502 *cpu)
 {
     uint8_t res = instruction_data(cpu) + 1;
 
-    set_flag(cpu, N, (res & 0x80) != 0);
-    set_flag(cpu, Z, res == 0);
+    set_flag(cpu, CPU_N, res & 0x80);
+    set_flag(cpu, CPU_Z, res == 0);
 
     bus_write(cpu->bus, cpu->instruction.addr, res);
 }
@@ -322,16 +350,16 @@ void inx(struct cpu_6502 *cpu)
 {
     cpu->reg.x++;
 
-    set_flag(cpu, N, (cpu->reg.x & 0x80) != 0);
-    set_flag(cpu, Z, cpu->reg.x == 0);
+    set_flag(cpu, CPU_N, cpu->reg.x & 0x80);
+    set_flag(cpu, CPU_Z, cpu->reg.x == 0);
 }
 
 void iny(struct cpu_6502 *cpu)
 {
     cpu->reg.y++;
 
-    set_flag(cpu, N, (cpu->reg.y & 0x80) != 0);
-    set_flag(cpu, Z, cpu->reg.y == 0);
+    set_flag(cpu, CPU_N, cpu->reg.y & 0x80);
+    set_flag(cpu, CPU_Z, cpu->reg.y == 0);
 }
 
 void jmp(struct cpu_6502 *cpu)
@@ -341,7 +369,7 @@ void jmp(struct cpu_6502 *cpu)
 
 void jsr(struct cpu_6502 *cpu)
 {
-    stack_push(cpu, cpu->reg.pc - 1);
+    stack_addr_push(cpu, cpu->reg.pc);
     cpu->reg.pc = cpu->instruction.addr;
 }
 
@@ -349,36 +377,36 @@ void lda(struct cpu_6502 *cpu)
 {
     cpu->reg.a = instruction_data(cpu);
 
-    set_flag(cpu, N, (cpu->reg.a & 0x80) != 0);
-    set_flag(cpu, Z, cpu->reg.a == 0);
+    set_flag(cpu, CPU_N, cpu->reg.a & 0x80);
+    set_flag(cpu, CPU_Z, cpu->reg.a == 0);
 }
 
 void ldx(struct cpu_6502 *cpu)
 {
     cpu->reg.x = instruction_data(cpu);
 
-    set_flag(cpu, N, (cpu->reg.x & 0x80) != 0);
-    set_flag(cpu, Z, cpu->reg.x == 0);
+    set_flag(cpu, CPU_N, cpu->reg.x & 0x80);
+    set_flag(cpu, CPU_Z, cpu->reg.x == 0);
 }
 
 void ldy(struct cpu_6502 *cpu)
 {
     cpu->reg.y = instruction_data(cpu);
 
-    set_flag(cpu, N, (cpu->reg.y & 0x80) != 0);
-    set_flag(cpu, Z, cpu->reg.y == 0);
+    set_flag(cpu, CPU_N, cpu->reg.y & 0x80);
+    set_flag(cpu, CPU_Z, cpu->reg.y == 0);
 }
 
 void lsr(struct cpu_6502 *cpu)
 {
     uint8_t res = instruction_data(cpu);
 
-    set_flag(cpu, C, (res & 0x01) != 0);
+    set_flag(cpu, CPU_C, res & 0x01);
 
     res >>= 1;
 
-    set_flag(cpu, Z, res == 0x00);
-    set_flag(cpu, N, false);
+    set_flag(cpu, CPU_Z, res == 0x00);
+    set_flag(cpu, CPU_N, res & 0x80);
 
     if (cpu->instruction.addressing_mode_fn == &am_acc)
         cpu->reg.a = res;
@@ -394,8 +422,8 @@ void ora(struct cpu_6502 *cpu)
 {
     cpu->reg.a |= instruction_data(cpu);
 
-    set_flag(cpu, N, (cpu->reg.a & 0x80) != 0);
-    set_flag(cpu, Z, cpu->reg.a == 0);
+    set_flag(cpu, CPU_N, cpu->reg.a & 0x80);
+    set_flag(cpu, CPU_Z, cpu->reg.a == 0x00);
 }
 
 void pha(struct cpu_6502 *cpu)
@@ -405,28 +433,35 @@ void pha(struct cpu_6502 *cpu)
 
 void php(struct cpu_6502 *cpu)
 {
-    stack_push(cpu, cpu->reg.s);
+    set_flag(cpu, CPU_B, true);
+    set_flag(cpu, CPU_U, true);
+    stack_push(cpu, cpu->reg.s.reg);
+    set_flag(cpu, CPU_B, false);
+    set_flag(cpu, CPU_U, false);
 }
 
 void pla(struct cpu_6502 *cpu)
 {
     cpu->reg.a = stack_pull(cpu);
+    set_flag(cpu, CPU_N, cpu->reg.a & 0x80);
+    set_flag(cpu, CPU_Z, cpu->reg.a == 0x00);
 }
 
 void plp(struct cpu_6502 *cpu)
 {
-    cpu->reg.s = stack_pull(cpu);
+    cpu->reg.s.reg = stack_pull(cpu);
+    set_flag(cpu, CPU_U, true);
 }
 
 void rol(struct cpu_6502 *cpu)
 {
     uint16_t res = (uint16_t)(instruction_data(cpu)) << 1;
-    res |= (uint16_t)get_flag(cpu, C);
+    res |= (uint16_t)get_flag(cpu, CPU_C);
 
-    set_flag(cpu, C, res > 0x00FF);
+    set_flag(cpu, CPU_C, res > 0x00FF);
 
-    set_flag(cpu, Z, (res & 0x00FF) == 0x00);
-    set_flag(cpu, N, (res & 0x0080) != 0);
+    set_flag(cpu, CPU_Z, (res & 0x00FF) == 0x00);
+    set_flag(cpu, CPU_N, res & 0x0080);
 
     if (cpu->instruction.addressing_mode_fn == &am_acc)
         cpu->reg.a = res & 0x00FF;
@@ -438,24 +473,26 @@ void ror(struct cpu_6502 *cpu)
 {
     uint8_t res = instruction_data(cpu);
 
-    set_flag(cpu, C, (res & 0x01) != 0);
+    set_flag(cpu, CPU_C, res & 0x01);
 
     res >>= 1;
-    res |= get_flag(cpu, C) << 7;
+    res |= get_flag(cpu, CPU_C) << 7;
 
-    set_flag(cpu, Z, res == 0x00);
-    set_flag(cpu, N, (res & 0x80) != 0);
+    set_flag(cpu, CPU_Z, res == 0x00);
+    set_flag(cpu, CPU_N, res & 0x80);
 
     if (cpu->instruction.addressing_mode_fn == &am_acc)
         cpu->reg.a = res;
     else
         bus_write(cpu->bus, cpu->instruction.addr, res);
-
 }
 
 void rti(struct cpu_6502 *cpu)
 {
-    cpu->reg.s = stack_pull(cpu);
+    cpu->reg.s.reg = stack_pull(cpu);
+    set_flag(cpu, CPU_B, false);
+    set_flag(cpu, CPU_U, false);
+
     cpu->reg.pc = stack_addr_pull(cpu);
 }
 
@@ -466,22 +503,39 @@ void rts(struct cpu_6502 *cpu)
 
 void sbc(struct cpu_6502 *cpu)
 {
+    uint16_t data = (uint16_t)instruction_data(cpu);
 
+    // res = A - data - ~C
+    // res = A + (~data + 1) - ~C
+    // res = A + (~data + 1) - (1 - C)
+    // res = A + ~data + C
+    
+    uint16_t res = (uint16_t)cpu->reg.a + ~data + (uint16_t)get_flag(cpu, CPU_C);
+
+    set_flag(cpu, CPU_C, res > 0x00FF);
+    set_flag(cpu, CPU_Z, (res & 0x00FF) == 0x00);
+    set_flag(cpu, CPU_N, (res & 0x0080) != 0x00);
+
+    bool overflow = ~(cpu->reg.a & 0x80) & (data & 0x80) & (res & 0x0080);
+    bool underflow = (cpu->reg.a & 0x80) & ~(data & 0x80) & ~(res & 0x0080);
+    set_flag(cpu, CPU_V, overflow || underflow);
+
+    cpu->reg.a = res & 0x00FF;
 }
 
 void sec(struct cpu_6502 *cpu)
 {
-    set_flag(cpu, C, true);
+    set_flag(cpu, CPU_C, true);
 }
 
 void sed(struct cpu_6502 *cpu)
 {
-    set_flag(cpu, D, true);
+    set_flag(cpu, CPU_D, true);
 }
 
 void sei(struct cpu_6502 *cpu)
 {
-    set_flag(cpu, I, true);
+    set_flag(cpu, CPU_I, true);
 }
 
 void sta(struct cpu_6502 *cpu)
@@ -503,32 +557,32 @@ void tax(struct cpu_6502 *cpu)
 {
     cpu->reg.x = cpu->reg.a;
 
-    set_flag(cpu, Z, cpu->reg.x == 0x00);
-    set_flag(cpu, N, (cpu->reg.x & 0x80) != 0);
+    set_flag(cpu, CPU_Z, cpu->reg.x == 0x00);
+    set_flag(cpu, CPU_N, cpu->reg.x & 0x80);
 }
 
 void tay(struct cpu_6502 *cpu)
 {
     cpu->reg.y = cpu->reg.a;
 
-    set_flag(cpu, Z, cpu->reg.y == 0x00);
-    set_flag(cpu, N, (cpu->reg.y & 0x80) != 0);
+    set_flag(cpu, CPU_Z, cpu->reg.y == 0x00);
+    set_flag(cpu, CPU_N, cpu->reg.y & 0x80);
 }
 
 void tsx(struct cpu_6502 *cpu)
 {
     cpu->reg.x = cpu->reg.sp;
 
-    set_flag(cpu, Z, cpu->reg.x == 0x00);
-    set_flag(cpu, N, (cpu->reg.x & 0x80) != 0);
+    set_flag(cpu, CPU_Z, cpu->reg.x == 0x00);
+    set_flag(cpu, CPU_N, cpu->reg.x & 0x80);
 }
 
 void txa(struct cpu_6502 *cpu)
 {
     cpu->reg.a = cpu->reg.x;
 
-    set_flag(cpu, Z, cpu->reg.a == 0x00);
-    set_flag(cpu, N, (cpu->reg.a & 0x80) != 0);
+    set_flag(cpu, CPU_Z, cpu->reg.a == 0x00);
+    set_flag(cpu, CPU_N, cpu->reg.a & 0x80);
 }
 
 void txs(struct cpu_6502 *cpu)
@@ -540,8 +594,8 @@ void tya(struct cpu_6502 *cpu)
 {
     cpu->reg.a = cpu->reg.y;
 
-    set_flag(cpu, Z, cpu->reg.a == 0x00);
-    set_flag(cpu, N, (cpu->reg.a & 0x80) != 0);
+    set_flag(cpu, CPU_Z, cpu->reg.a == 0x00);
+    set_flag(cpu, CPU_N, cpu->reg.a & 0x80);
 }
 
 // Addressing modes
@@ -565,7 +619,7 @@ void am_abx(struct cpu_6502 *cpu)
     uint8_t low = fetch(cpu);
     uint8_t high = fetch(cpu);
 
-    cpu->instruction.addr = ((uint16_t)high << 8) | (uint16_t)low + (uint16_t)cpu->reg.x;
+    cpu->instruction.addr = (((uint16_t)high << 8) | (uint16_t)low) + (uint16_t)cpu->reg.x;
     cpu->instruction.operand0 = low;
     cpu->instruction.operand1 = high;
 
@@ -579,7 +633,7 @@ void am_aby(struct cpu_6502 *cpu)
     uint8_t low = fetch(cpu);
     uint8_t high = fetch(cpu);
 
-    cpu->instruction.addr = ((uint16_t)high << 8) | (uint16_t)low + (uint16_t)cpu->reg.y;
+    cpu->instruction.addr = (((uint16_t)high << 8) | (uint16_t)low) + (uint16_t)cpu->reg.y;
     cpu->instruction.operand0 = low;
     cpu->instruction.operand1 = high;
 
@@ -605,7 +659,10 @@ void am_ind(struct cpu_6502 *cpu)
 
     uint16_t ptr = ((uint16_t)high << 8) | (uint16_t)low;
 
-    cpu->instruction.addr = ((uint16_t)bus_read(cpu->bus, ptr + 1) << 8) | (uint16_t)bus_read(cpu->bus, ptr);
+    if (low == 0x00FF)
+        cpu->instruction.addr = ((uint16_t)bus_read(cpu->bus, ptr & 0xFF00) << 8) | (uint16_t)bus_read(cpu->bus, ptr);
+    else
+        cpu->instruction.addr = ((uint16_t)bus_read(cpu->bus, ptr + 1) << 8) | (uint16_t)bus_read(cpu->bus, ptr);
     cpu->instruction.operand0 = low;
     cpu->instruction.operand1 = high;
 
@@ -614,7 +671,6 @@ void am_ind(struct cpu_6502 *cpu)
     if (low == 0xFF)
         cpu->instruction.addr = ((uint16_t)bus_read(cpu->bus, ptr & 0xFF00) << 8) | (uint16_t)bus_read(cpu->bus, ptr);
     */
-    
 }
 
 // Aka indexed indirect
@@ -629,7 +685,7 @@ void am_inx(struct cpu_6502 *cpu)
     cpu->instruction.addr = ((uint16_t)high << 8) | (uint16_t)low;
 }
 
-// aka indirect indexed
+// Aka indirect indexed
 void am_iny(struct cpu_6502 *cpu)
 {
     cpu->instruction.operand0 = fetch(cpu);
@@ -647,12 +703,12 @@ void am_iny(struct cpu_6502 *cpu)
 
 void am_rel(struct cpu_6502 *cpu)
 {
-    uint16_t initial_pc = cpu->reg.pc;
     cpu->instruction.operand0 = fetch(cpu);
-    cpu->instruction.addr = (int16_t)initial_pc + (int16_t)(int8_t)cpu->instruction.operand0;
+    int16_t offset = (int8_t)cpu->instruction.operand0;
+    cpu->instruction.addr = (int16_t)cpu->reg.pc + offset;
 
     // Crossed page boundary, +1 cycle penalty
-    if ((cpu->instruction.addr & 0xFF00) != (initial_pc << 8))
+    if ((cpu->instruction.addr & 0xFF00) != (cpu->reg.pc << 8))
         cpu->cycles_till_instruction_completion++;
 }
 

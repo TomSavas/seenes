@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#include "seenes.h"
+
 struct cpu_6502;
 struct instruction
 {
@@ -20,29 +22,36 @@ struct instruction
     uint16_t addr;
 };
 
-enum status_flag
+enum cpu_status_flag
 {
-    C = 0x01,
-    Z = 0x02,
-    I = 0x04,
-    D = 0x08,
-    B = 0x10, // unused in nes
-    U = 0x20, // unused in 6502
-    V = 0x40,
-    N = 0x80
+    CPU_C = 0x01,
+    CPU_Z = 0x02,
+    CPU_I = 0x04,
+    CPU_D = 0x08,
+    CPU_B = 0x10, // unused in nes
+    CPU_U = 0x20, // unused in 6502
+    CPU_V = 0x40,
+    CPU_N = 0x80
 };
 
-struct status_flags
+#pragma pack(1)
+union cpu_status_reg
 {
-    bool c: 1;
-    bool z: 1;
-    bool i: 1;
-    bool d: 1;
-    bool b: 1; // unused in nes
-    bool u: 1; // unused in 6502
-    bool v: 1;
-    bool n: 1;
+    uint8_t reg;
+    struct
+    {
+        uint8_t c: 1;
+        uint8_t z: 1;
+        uint8_t i: 1;
+        uint8_t d: 1;
+        uint8_t b: 1; // unused in nes
+        uint8_t u: 1; // unused in 6502
+        uint8_t v: 1;
+        uint8_t n: 1;
+    };
 };
+SEENES_STATIC_ASSERT(sizeof(union cpu_status_reg) == 1, cpu_status_reg_is_1_byte);
+#pragma pack(0)
 
 struct cpu_registers
 {
@@ -51,11 +60,7 @@ struct cpu_registers
     uint8_t y;
     uint16_t pc;
     uint8_t sp;
-    union 
-    {
-        struct status_flags status_flags;
-        uint8_t s;
-    };
+    union cpu_status_reg s;
 };
 
 struct bus;
@@ -64,17 +69,22 @@ struct cpu_6502
     struct cpu_registers reg;
     struct bus *bus;
     
+    uint8_t raw_instruction;
     struct instruction instruction;
     uint8_t cycles_till_instruction_completion;
 
     uint64_t cycles;
+
+    bool disable_instruction_execution;
 };
 
-uint8_t get_flag(struct cpu_6502 *cpu, enum status_flag flag);
-void set_flag(struct cpu_6502 *cpu, enum status_flag flag, bool set);
+uint8_t get_flag(struct cpu_6502 *cpu, enum cpu_status_flag flag);
+void set_flag(struct cpu_6502 *cpu, enum cpu_status_flag flag, bool set);
 
 bool cpu_clock(struct cpu_6502 *cpu);
 void cpu_reset(struct cpu_6502 *cpu);
+
+void nmi(struct cpu_6502 *cpu);
 
 // instructions
 void adc(struct cpu_6502 *cpu);

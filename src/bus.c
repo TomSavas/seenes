@@ -63,7 +63,7 @@ uint8_t bus_read(struct bus *bus, uint16_t addr)
             return mmio_read(bus->devices[i], addr);
     }
 
-    return 0x00;
+    assert(false);
 }
 
 void bus_write(struct bus *bus, uint16_t addr, uint8_t val)
@@ -71,6 +71,11 @@ void bus_write(struct bus *bus, uint16_t addr, uint8_t val)
     for (int i = 0; i < bus->devices_count; i++)
     {
         if (mmio_in_managed_range(bus->devices[i], addr))
+        {
             mmio_write(bus->devices[i], addr, val);
+            return;
+        }
     }
+
+    assert(false);
 }
